@@ -61,7 +61,7 @@ biblioteca JavaScript de terceros.
 Consecuencia práctica: si el usuario pide «un MP3», se genera con Piper. Si pide «escucharlo», la página vale y
 es instantánea.
 
-### La tercera vía, investigada y descartada por coste
+### La tercera vía: MP3 con un motor dentro de la página
 
 Sí existe una forma de generar audio —y MP3— dentro de una página: **no usar la voz del sistema, sino un motor
 de síntesis compilado a WebAssembly**. Proyectos como `piper-tts-web` (MIT) devuelven un WAV listo para
@@ -76,7 +76,7 @@ Lo que cuesta, medido con las cifras publicadas por esos proyectos:
 | Datos de espeak-ng | ~17 MB | Fonemización |
 | Codificador MP3 en JS | ~150 KB | Necesario: el navegador no codifica MP3 |
 
-Dos consecuencias que lo descartan como modo por defecto:
+Dos consecuencias que lo aplazan, no que lo hagan imposible:
 
 1. **No ahorra la instalación, la cambia de sitio.** La primera vez hay que bajar ~90 MB, y no se puede cachear
    si la página se abre con `file://`: ese origen es opaco y el navegador no le da almacenamiento persistente.
