@@ -283,7 +283,9 @@ reglas del guion y las dos formas de escucharlo están en `references/audio.md`;
    Genera un HTML autocontenido que se abre en Edge, Chrome, Firefox o Brave. Si el usuario necesita un
    archivo (coche, móvil, compartir, escuchar sin navegador), genera **MP3** con
    `skills/speak-summary/scripts/tts.sh guion.txt <ruta>.mp3`. El navegador **no puede exportar** el audio que
-   sintetiza: no prometas un MP3 desde la página.
+   sintetiza: ni la captura de pestaña recoge la voz (informe 40753195 de Chromium), ni ningún navegador
+   codifica MP3. No hay botón de descarga en la página, y no es un olvido: un MP3 dentro del navegador exige un
+   motor WASM de ~90 MB servido por `http` (`references/audio.md` § tercera vía).
 5. **Salida.** Guion en `<perfil>/materiales/generados/audio/<código>_resumen_<YYYY-MM-DD>.txt` y, al lado, el
    `.html` o el `.mp3`. Si el archivo ya existe, sustitúyelo y dilo.
 6. **Verifica y reporta.** Con MP3, duración y tamaño con `ffprobe`; si se aleja de 20 minutos (menos de 18 o

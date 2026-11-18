@@ -1,6 +1,6 @@
 ---
 title: Audio y reproductores
-description: Cómo se convierte un guion en algo escuchable. Dos motores (voz del navegador y Piper a MP3), qué puede y qué no puede hacer cada uno, y las reglas del guion hablado.
+description: Cómo se convierte un guion en algo escuchable. Dos motores en uso (voz del navegador y Piper a MP3), por qué el navegador no puede exportar su propia voz, qué costaría hacerlo con un motor WASM, y las reglas del guion hablado.
 idioma: es-ES
 capa: núcleo
 ---
@@ -47,8 +47,47 @@ salida; no expone un `MediaStream`, así que `MediaRecorder` no lo captura. La A
 trozos de audio, pero solo para extensiones y no en una página normal. Grabar la salida del sistema con un
 dispositivo virtual es posible fuera del navegador, y no es portable: no se propone.
 
+Tampoco sirve capturar la pestaña. La captura de audio de pestaña (`getDisplayMedia({audio: true})`) recoge el
+audio del grafo de la pestaña, y en Chromium la voz sintetizada no pasa por ahí: sale por el motor de voz del
+sistema, fuera de la pestaña. Está documentado en el informe
+[40753195](https://issues.chromium.org/issues/40753195), abierto desde 2021. Solo la captura de **pantalla
+completa con audio del sistema** recoge esa voz, y eso obliga a compartir el escritorio, mezcla el resto de
+sonidos y depende del sistema operativo.
+
+Y aunque se capturase, no saldría un MP3: `MediaRecorder` entrega WebM/Opus, y **ningún navegador codifica MP3**
+(`AudioEncoder` con `mp3` tiene 0 % de soporte en la tabla de WebCodecs; solo decodifica). Convertirlo exige una
+biblioteca JavaScript de terceros.
+
 Consecuencia práctica: si el usuario pide «un MP3», se genera con Piper. Si pide «escucharlo», la página vale y
 es instantánea.
+
+### La tercera vía, investigada y descartada por coste
+
+Sí existe una forma de generar audio —y MP3— dentro de una página: **no usar la voz del sistema, sino un motor
+de síntesis compilado a WebAssembly**. Proyectos como `piper-tts-web` (MIT) devuelven un WAV listo para
+descargar, y con un codificador JavaScript (`lamejs`) se convierte en MP3.
+
+Lo que cuesta, medido con las cifras publicadas por esos proyectos:
+
+| Pieza | Tamaño | Nota |
+|---|---|---|
+| Voz Piper (`.onnx` + `.json`) | 30–75 MB | Una por idioma, caché del navegador |
+| `onnxruntime-web` | ~10 MB | Motor de inferencia |
+| Datos de espeak-ng | ~17 MB | Fonemización |
+| Codificador MP3 en JS | ~150 KB | Necesario: el navegador no codifica MP3 |
+
+Dos consecuencias que lo descartan como modo por defecto:
+
+1. **No ahorra la instalación, la cambia de sitio.** La primera vez hay que bajar ~90 MB, y no se puede cachear
+   si la página se abre con `file://`: ese origen es opaco y el navegador no le da almacenamiento persistente.
+   Hace falta servirla por `http://localhost`, o sea, un servidor estático.
+2. **Es más lento y peor voz que la del sistema.** La inferencia en CPU va a 3–5× el tiempo real; la página
+   actual es instantánea y usa la voz que el usuario ya tiene instalada.
+
+Por eso la página de escucha no lleva botón de descarga: un botón que solo funciona en la mitad de los casos y
+tras una descarga de 90 MB es peor que decir la verdad. La ruta WASM queda como puerta abierta para un modo sin
+Python, no como función de esta página. Si algún día se implementa, va como página aparte y con su propio
+contrato: aviso de tamaño, caché en origen `http` y MP3 opcional.
 
 ### Comprobación de viabilidad
 
@@ -95,3 +134,4 @@ El guion es lo que hace útil al audio. Se escribe para el oído, no se lee de l
 | Se corta a media frase | Párrafo demasiado largo | Párrafos más cortos en el guion |
 | Pronuncia mal un nombre | Grafía opaca | Escribirlo fonéticamente en el guion |
 | El MP3 dura 12 minutos | Guion corto | Ampliar contenido, no estirar el relleno |
+| No hay botón de descarga en la página | Es deliberado: el navegador no captura su voz ni codifica MP3 | Generar el MP3 con Piper |

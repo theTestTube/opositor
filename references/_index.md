@@ -77,3 +77,24 @@ Consecuencias que conviene tener presentes:
 - Listas de dominios de un sector, salvo como *ejemplo* genérico de nivel de autoridad.
 - Rutas absolutas de una máquina (`/home/...`): siempre `<perfil>`.
 - Fechas de comprobación de una oposición concreta: van en el perfil.
+
+## Niebla: la versión sin Python
+
+El objetivo a medio plazo es que el único requisito sea un harness que cumpla la
+[especificación de Agent Skills](https://agentskills.io/specification) más dos herramientas: una que interactúe
+con el sintetizador —con el motor Python y, si falta, la caída al navegador, incluido el MP3— y otra que
+escriba el PDF del examen.
+
+Hoy el formato ya cumple: los tres `SKILL.md` validan con `skills-ref`. Lo que no cumple es la dependencia:
+`scripts/opositor.py`, `examen_pdf.py` y `tts_page.py` son Python, y el MP3 necesita Piper.
+
+Lo investigado hasta ahora, para no repetirlo:
+
+- **El MP3 en navegador no elimina el servidor.** Un motor de síntesis WASM (~90 MB la primera vez) produce el
+  audio en la página, pero su caché necesita un origen `http`, no `file://`. Sirve para quitar Piper, no para
+  quitar todo lo demás.
+- **El PDF sí es sustituible por completo**, pero no por un script suelto: o lo escribe el harness con sus
+  propias herramientas de documento, o se genera HTML imprimible desde una página, que es la vía sin
+  dependencias.
+- **La validación del perfil no necesita código**: `check` es una lista de reglas que cualquier agente puede
+  aplicar leyendo los archivos.
