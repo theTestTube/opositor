@@ -1,0 +1,20 @@
+# --- Datos de estudio: nunca se versionan -------------------------------------
+# Cada oposición vive en oposiciones/<slug>/ (temario, fuentes, materiales y
+# salidas). Es material privado del usuario: temario copiado, apuntes, exámenes,
+# PDFs y audios generados. El repositorio solo versiona el núcleo agnóstico.
+oposiciones/
+
+# Artefactos de trabajo y borradores fuera de control de versiones.
+.scratchpad/
+
+# --- Salidas sueltas ----------------------------------------------------------
+*.mp3
+*.wav
+*.m4a
+*.pdf
+
+# --- Entorno ------------------------------------------------------------------
+__pycache__/
+*.pyc
+.venv/
+node_modules/
