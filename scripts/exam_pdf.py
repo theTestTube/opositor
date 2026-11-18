@@ -3,7 +3,7 @@
 
 Usage:
     python3 exam_pdf.py bank.json <profile>/materials/generated/E7_practice_exam.pdf \
-        [--profile <profile>/config.json] [--difficulty low|high]
+        [--profile <profile>/config.json] [--difficulty low|high|max]
 
 Bank format (UTF-8):
 {
@@ -25,7 +25,7 @@ The exam name, scope and document texts come from the profile
 (`config.json -> name, scope, pdf.texts`). Without a profile, the English defaults are used.
 
 Difficulty comes from --difficulty or, if absent, from the bank's "difficulty" field
-(default: low). It only changes the PDF header: the real level is set by the questions in the bank
+(default: low; levels: low, high, max). It only changes the PDF header: the real level is set by the questions in the bank
 (see SKILL.md, section 9). A block with "scenario" prints the case in a box before its questions.
 
 The script shuffles the options and spreads the correct letter evenly.
@@ -65,7 +65,7 @@ TEXTS = {
     "footer": "Topic {code}",
     "meta_title": "Practice exam · Topic {code} · difficulty {difficulty}",
     "meta_author": "{name}",
-    "difficulties": {"low": "low", "high": "high"},
+    "difficulties": {"low": "low", "high": "high", "max": "maximum"},
 }
 
 
@@ -100,9 +100,10 @@ def typography():
 def validate(bank, difficulty):
     errors = []
     if difficulty not in TEXTS["difficulties"]:
-        errors.append(f"Unknown difficulty: {difficulty} (use low or high)")
-    if difficulty == "high" and not any(b.get("scenario") for b in bank["blocks"]):
-        print("Warning: high difficulty with no block that has a practical scenario.", file=sys.stderr)
+        errors.append(f"Unknown difficulty: {difficulty} (use low, high or max)")
+    if difficulty in ("high", "max") and not any(b.get("scenario") for b in bank["blocks"]):
+        print(f"Warning: {difficulty} difficulty with no block that has a practical scenario.",
+              file=sys.stderr)
     for b in bank["blocks"]:
         for p in b["questions"]:
             options = [p["answer"], *p["distractors"]]
@@ -240,7 +241,7 @@ if __name__ == "__main__":
     ap.add_argument("bank", help="question bank in JSON")
     ap.add_argument("pdf", help="output PDF path")
     ap.add_argument("--difficulty", choices=sorted(TEXTS["difficulties"]),
-                    help="low (default) or high; if absent, the bank's 'difficulty' field is used")
+                    help="low (default), high or max; if absent, the bank's 'difficulty' field is used")
     ap.add_argument("--profile", help="config.json of the profile (name, scope and document texts)")
     args = ap.parse_args()
     main(args.bank, args.pdf, args.difficulty, args.profile)

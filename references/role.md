@@ -68,7 +68,7 @@ Checked against the gazette on <YYYY-MM-DD>.
 - **In the list of sources.** When the topic is about the category, the duties or the working time, the
   regulation is an N1 source: currency 2 and specificity 2. It is cited with the literal definition, not with a
   summary.
-- **In the `high` exam.** The format of the official exercise (parts, times, reserves, penalty) defines the
+- **In the `high` and `max` exams.** The format of the official exercise (parts, times, reserves, penalty) defines the
   structure of the bank: practical scenarios if the real exercise has them, literal detail if the real one asks
   for it. If the profile does not document the format, say so and use the default format in `SKILL.md` §9.
 - **In the answer.** If the user asks about the role and the profile is not documented, do not cite a regulation

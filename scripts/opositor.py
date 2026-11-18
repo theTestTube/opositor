@@ -6,7 +6,8 @@ Usage:
     python3 scripts/opositor.py check [<slug>] [--privacy]
     python3 scripts/opositor.py path [<slug>] [--json]
     python3 scripts/opositor.py home [--json]
-    python3 scripts/opositor.py pdf <bank.json> <output.pdf> [--profile <config.json>] [--difficulty low|high]
+    python3 scripts/opositor.py pdf <bank.json> <output.pdf> [--profile <config.json>] [--difficulty low|high|max]
+    python3 scripts/opositor.py overlap <new_bank.json> <earlier.json|earlier.pdf>... [--json report.json]
     python3 scripts/opositor.py tts-page <script.txt> <output.html> [--title T] [--lang en] [--ui labels.json]
     python3 scripts/opositor.py tts-page --demo <output.html>
     python3 scripts/opositor.py doctor
@@ -321,6 +322,13 @@ def cmd_pdf(args):
     return subprocess.run(argv).returncode
 
 
+def cmd_overlap(args):
+    argv = [sys.executable, str(ROOT / "scripts" / "overlap.py"), args.bank, *args.previous]
+    if args.json:
+        argv += ["--json", args.json]
+    return subprocess.run(argv).returncode
+
+
 def cmd_tts_page(args):
     sys.path.insert(0, str(ROOT / "scripts"))
     from tts_page import build_page
@@ -412,8 +420,14 @@ def main():
     p.add_argument("bank")
     p.add_argument("pdf")
     p.add_argument("--profile", help="config.json of the profile (name, scope and document texts)")
-    p.add_argument("--difficulty", choices=("low", "high"))
+    p.add_argument("--difficulty", choices=("low", "high", "max"))
     p.set_defaults(func=cmd_pdf)
+
+    p = sub.add_parser("overlap", help="check a new bank against the topic's earlier exams")
+    p.add_argument("bank", help="new question bank (JSON)")
+    p.add_argument("previous", nargs="+", help="earlier banks (JSON) or exam PDFs of the same topic")
+    p.add_argument("--json", help="write the full report to this file")
+    p.set_defaults(func=cmd_overlap)
 
     p = sub.add_parser("tts-page", help="generate the browser listen page")
     p.add_argument("text", nargs="?")
