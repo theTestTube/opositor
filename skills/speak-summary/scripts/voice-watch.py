@@ -1,20 +1,21 @@
 #!/usr/bin/env python3
-"""Watch for new Castilian Spanish voices usable with pocket-tts.
+"""Watch for new voices usable with the configured language.
 
 Weekly cron-style check. Compares three sources against the previous snapshot:
 
   1. the kyutai/tts-voices repository (donated / public voice samples)
-  2. Hugging Face models matching "pocket-tts" that mention Spanish
-  3. the pocket-tts model card voice catalogue
+  2. Hugging Face models matching "pocket-tts" that mention the language
+  3. the Piper voice catalogue for that language
 
-A change does not mean a better accent: it means there is something new worth
+A change does not mean a better voice: it means there is something new worth
 listening to. Nothing is downloaded and nothing is installed; this only reports.
 
 Usage:
     python3 voice-watch.py            # check, report changes
     python3 voice-watch.py --status   # show last snapshot summary only
 
-State lives in $SPEAK_VOICE_WATCH_DIR (default ~/.cache/opositor/voice-watch).
+Language: $SPEAK_WATCH_LANG (default "en"). State lives in
+$SPEAK_VOICE_WATCH_DIR (default ~/.cache/opositor/voice-watch).
 """
 
 from __future__ import annotations
@@ -39,16 +40,33 @@ LOG = STATE_DIR / "log.md"
 
 TTL_HOURS = 24  # allow skipping a re-fetch if a check already ran today
 TIMEOUT = 60
+LANG_CODE = os.environ.get("SPEAK_WATCH_LANG", "en").split("-")[0].lower()
 
-# A voice counts as Spanish-relevant if its path or name says so. Deliberately
-# narrow: plain "es" would match half the internet.
-SPANISH_RE = re.compile(r"(spanish|espa[nñ]ol|castell|castilian|\bes[-_](es|ES)\b|lola)", re.I)
+# English names for the languages pocket-tts and Piper publish. An unknown code
+# still works: only the code itself is matched.
+LANG_NAMES = {
+    "en": "english",
+    "es": "spanish",
+    "fr": "french",
+    "de": "german",
+    "it": "italian",
+    "pt": "portuguese",
+    "nl": "dutch",
+}
+LANG_NAME = LANG_NAMES.get(LANG_CODE, LANG_CODE)
+
+# A voice counts as relevant if its path or name says so. Deliberately narrow:
+# a bare two-letter code would match half the internet.
+LANG_RE = re.compile(rf"({re.escape(LANG_NAME)}|(?<![a-z]){re.escape(LANG_CODE)}[-_][A-Z]{{2}})", re.I)
 
 SOURCES = {
     "tts-voices": "https://huggingface.co/kyutai/tts-voices/resolve/main/README.md",
 }
 
-PIPER_TREE = "https://huggingface.co/api/models/rhasspy/piper-voices/tree/main/es?recursive=true&limit=1000"
+PIPER_TREE = (
+    f"https://huggingface.co/api/models/rhasspy/piper-voices/tree/main/{LANG_CODE}"
+    "?recursive=true&limit=1000"
+)
 
 
 def fetch(url: str) -> bytes:
@@ -86,13 +104,13 @@ def tts_voice_files() -> list[str]:
 
 
 def hf_pocket_models() -> list[str]:
-    """Community pocket-tts models whose name suggests Spanish."""
+    """Community pocket-tts models whose name suggests the language."""
     data = json.loads(fetch("https://huggingface.co/api/models?search=pocket-tts&limit=200"))
-    return [m["id"] for m in data if SPANISH_RE.search(m["id"])]
+    return [m["id"] for m in data if LANG_RE.search(m["id"])]
 
 
-def piper_es_voices() -> list[str]:
-    """Castilian (es_ES) voices in rhasspy/piper-voices. Ungated, no login."""
+def piper_lang_voices() -> list[str]:
+    """Voices for the configured language in rhasspy/piper-voices. Ungated, no login."""
     out: list[str] = []
     url: str | None = PIPER_TREE
     seen = 0
@@ -102,10 +120,11 @@ def piper_es_voices() -> list[str]:
             entries = json.load(r)
             cursor = next_cursor(r.headers.get("link", ""))
         out.extend(
-            e["path"] for e in entries if e["path"].endswith(".onnx") and "/es_ES/" in e["path"]
+            e["path"] for e in entries
+            if e["path"].endswith(".onnx") and f"/{LANG_CODE}_" in e["path"]
         )
         url = (
-            "https://huggingface.co/api/models/rhasspy/piper-voices/tree/main/es"
+            f"https://huggingface.co/api/models/rhasspy/piper-voices/tree/main/{LANG_CODE}"
             f"?recursive=true&limit=1000&cursor={cursor}"
             if cursor
             else None
@@ -115,13 +134,13 @@ def piper_es_voices() -> list[str]:
 
 
 def collect() -> tuple[list[str], list[str]]:
-    """Gather Spanish candidates. One failing source must not kill the check."""
+    """Gather candidates for the language. One failing source must not kill the check."""
     snap: list[str] = []
     errors: list[str] = []
     steps = (
-        ("tts-voices", lambda: [f"tts-voices::{p}" for p in tts_voice_files() if SPANISH_RE.search(p)]),
+        ("tts-voices", lambda: [f"tts-voices::{p}" for p in tts_voice_files() if LANG_RE.search(p)]),
         ("hf-model", lambda: [f"hf-model::{m}" for m in hf_pocket_models()]),
-        ("piper-es_ES", lambda: [f"piper::{p}" for p in piper_es_voices()]),
+        ("piper", lambda: [f"piper::{p}" for p in piper_lang_voices()]),
     )
     for name, step in steps:
         try:
@@ -148,7 +167,7 @@ def main() -> int:
             print("No snapshot yet: run without --status first.")
             return 0
         lines = SNAPSHOT.read_text().splitlines()
-        print(f"{len(lines)} known Spanish candidates (snapshot {SNAPSHOT})")
+        print(f"{len(lines)} known {LANG_NAME} candidates (snapshot {SNAPSHOT})")
         print("\n".join(lines[:20]))
         return 0
 
@@ -158,42 +177,42 @@ def main() -> int:
         print(f"voice-watch: check aborted ({exc})", file=sys.stderr)
         return 0
     for err in errors:
-        print(f"voice-watch: aviso, fuente no disponible -> {err}", file=sys.stderr)
+        print(f"voice-watch: warning, source unavailable -> {err}", file=sys.stderr)
 
     previous = SNAPSHOT.read_text().splitlines() if SNAPSHOT.exists() else []
-    new = [l for l in current if l not in previous]
-    gone = [l for l in previous if l not in current]
+    new = [line for line in current if line not in previous]
+    gone = [line for line in previous if line not in current]
 
     SNAPSHOT.write_text("\n".join(current) + "\n")
 
     stamp = dt.datetime.now().strftime("%Y-%m-%d %H:%M")
     with LOG.open("a", encoding="utf-8") as fh:
-        fh.write(f"- {stamp} · {len(current)} candidatos · {len(new)} nuevos · {len(gone)} desaparecidos\n")
+        fh.write(f"- {stamp} · {len(current)} candidates · {len(new)} new · {len(gone)} gone\n")
 
     if not new and not gone:
-        print(f"voice-watch: sin cambios ({len(current)} candidatos).")
+        print(f"voice-watch: no changes ({len(current)} candidates).")
         return 0
 
     report = REPORTS / f"{today}.md"
-    body = [f"# Voces españolas: cambios {stamp}", ""]
+    body = [f"# {LANG_NAME.capitalize()} voices: changes {stamp}", ""]
     if new:
-        body += ["## Nuevas", ""] + [f"- `{l}`" for l in new] + [""]
+        body += ["## New", ""] + [f"- `{line}`" for line in new] + [""]
     if gone:
-        body += ["## Ya no están", ""] + [f"- `{l}`" for l in gone] + [""]
+        body += ["## Gone", ""] + [f"- `{line}`" for line in gone] + [""]
     body += [
-        "## Siguiente paso",
+        "## Next step",
         "",
-        "Escuchar las muestras nuevas y quedarse con la que suene castellana",
-        "(distinción /θ/ en *z*, *ce*, *ci*; sin seseo ni ceceo).",
+        f"Listen to the new samples and keep the one that sounds right for {LANG_NAME}.",
+        "Set it with SPEAK_PIPER_VOICE, or drop it in the voices directory.",
         "",
     ]
     report.write_text("\n".join(body), encoding="utf-8")
 
     notify(
-        "speak-summary: voces nuevas",
-        f"{len(new)} candidata(s) en español. Abre {report}",
+        "speak-summary: new voices",
+        f"{len(new)} {LANG_NAME} candidate(s). Open {report}",
     )
-    print(f"voice-watch: {len(new)} nuevas, {len(gone)} desaparecidas -> {report}")
+    print(f"voice-watch: {len(new)} new, {len(gone)} gone -> {report}")
     return 0
 
 

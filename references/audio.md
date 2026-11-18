@@ -1,137 +1,141 @@
 ---
-title: Audio y reproductores
-description: Cómo se convierte un guion en algo escuchable. Dos motores en uso (voz del navegador y Piper a MP3), por qué el navegador no puede exportar su propia voz, qué costaría hacerlo con un motor WASM, y las reglas del guion hablado.
-idioma: es-ES
-capa: núcleo
+title: Audio and players
+description: How a script becomes something listenable. Two engines in use (browser voice and Piper to MP3), why the browser cannot export its own voice, what a WASM engine would cost, and the rules of the spoken script.
+layer: core
 ---
 
-# Audio y reproductores
+# Audio and players
 
-Dos formas de escuchar un tema, con costes distintos. La de por defecto no instala nada.
+Two ways to listen to a topic, at different costs. The default one installs nothing.
 
-| | Página de escucha | MP3 local (Piper) |
+| | Listen page | Local MP3 (Piper) |
 |---|---|---|
-| Requisitos | Un navegador con voces | `piper`, voces y `ffmpeg` |
-| Salida | HTML autocontenido | `.mp3` |
-| Instalación | Ninguna | Entorno Python + descarga de voz |
-| Voz | La del sistema, elegible | Modelo neuronal fijo |
-| Sin conexión | Sí | Sí |
-| Exportable | **No** | Sí |
-| Uso típico | Repasar en el escritorio, seguir el guion | Coche, móvil, compartir |
+| Requirements | A browser with voices | `piper`, voices and `ffmpeg` |
+| Output | Self-contained HTML | `.mp3` |
+| Installation | None | Python environment + voice download |
+| Voice | The system's, selectable | Fixed neural model |
+| Offline | Yes | Yes |
+| Exportable | **No** | Yes |
+| Typical use | Reviewing on the desktop, following the script | Car, phone, sharing |
 
-## La página de escucha
+## The listen page
 
 ```bash
-python3 scripts/opositor.py tts-page guion.txt <perfil>/materiales/generados/audio/E7_resumen.html \
-  --titulo "Tema E7 · Resumen"
+python3 scripts/opositor.py tts-page script.txt <profile>/materials/generated/audio/E7_summary.html \
+  --title "Topic E7 · Summary"
 ```
 
-Genera un HTML sin dependencias que se abre en Edge, Chrome, Firefox o Brave. Usa la **Web Speech API**
-(`speechSynthesis`), que todos los navegadores de escritorio modernos implementan:
+It generates a dependency-free HTML file that opens in Edge, Chrome, Firefox or Brave. It uses the **Web Speech
+API** (`speechSynthesis`), which every modern desktop browser implements:
 
-| Navegador | Voces | Nota |
+| Browser | Voices | Note |
 |---|---|---|
-| Edge | Sistema + voces en línea de alta calidad | Las voces en línea pueden requerir conexión |
-| Chrome | Voces del sistema | En Linux pasa por `speech-dispatcher` |
-| Brave | Voces de Chromium | Igual que Chrome; el modo lectura no sustituye a la página |
-| Firefox | Voces del sistema | En Linux, sin `speech-dispatcher` puede quedarse sin voces |
-| Safari | Voces del sistema | Funciona, con otra selección de voces |
+| Edge | System + high-quality online voices | Online voices may need a connection |
+| Chrome | System voices | On Linux it goes through `speech-dispatcher` |
+| Brave | Chromium voices | Same as Chrome; reading mode does not replace the page |
+| Firefox | System voices | On Linux, without `speech-dispatcher` it may have no voices |
+| Safari | System voices | Works, with a different voice selection |
 
-La página trae selector de voz (filtrado por el idioma del perfil), velocidad, párrafo actual resaltado,
-clic en un párrafo para empezar ahí y atajos de teclado. Si detecta cero voces, lo dice y propone el MP3.
+The page has a voice selector (filtered by the profile's language), speed, the current paragraph highlighted,
+click a paragraph to start there, and keyboard shortcuts. If it detects zero voices, it says so and offers MP3.
 
-### Lo que el navegador no puede hacer
+The page chrome is in English. If the user works in another language, write a small JSON file with the labels
+and pass it with `--ui:` the accepted keys are `play`, `pause`, `resume`, `previous`, `next`, `stop`, `voice`,
+`speed`, `ready`, `finished`, `stopped`, `paused`, `resumed`, `paragraph`, `of`, `error`, `no_voices` and
+`footer`. Missing keys keep the English default, so a partial file is fine.
 
-**No se puede exportar el audio que sintetiza.** `speechSynthesis` reproduce directamente en el dispositivo de
-salida; no expone un `MediaStream`, así que `MediaRecorder` no lo captura. La API `chrome.tts` sí puede entregar
-trozos de audio, pero solo para extensiones y no en una página normal. Grabar la salida del sistema con un
-dispositivo virtual es posible fuera del navegador, y no es portable: no se propone.
+### What the browser cannot do
 
-Tampoco sirve capturar la pestaña. La captura de audio de pestaña (`getDisplayMedia({audio: true})`) recoge el
-audio del grafo de la pestaña, y en Chromium la voz sintetizada no pasa por ahí: sale por el motor de voz del
-sistema, fuera de la pestaña. Está documentado en el informe
-[40753195](https://issues.chromium.org/issues/40753195), abierto desde 2021. Solo la captura de **pantalla
-completa con audio del sistema** recoge esa voz, y eso obliga a compartir el escritorio, mezcla el resto de
-sonidos y depende del sistema operativo.
+**It cannot export the audio it synthesises.** `speechSynthesis` plays directly to the output device; it does
+not expose a `MediaStream`, so `MediaRecorder` cannot capture it. The `chrome.tts` API can deliver audio chunks,
+but only to extensions, not to a normal page. Recording the system output with a virtual device is possible
+outside the browser, and it is not portable: it is not proposed.
 
-Y aunque se capturase, no saldría un MP3: `MediaRecorder` entrega WebM/Opus, y **ningún navegador codifica MP3**
-(`AudioEncoder` con `mp3` tiene 0 % de soporte en la tabla de WebCodecs; solo decodifica). Convertirlo exige una
-biblioteca JavaScript de terceros.
+Capturing the tab does not help either. Tab audio capture (`getDisplayMedia({audio: true})`) records the audio
+of the tab's graph, and in Chromium the synthesised voice does not go through it: it comes out of the system
+speech engine, outside the tab. It is documented in issue
+[40753195](https://issues.chromium.org/issues/40753195), open since 2021. Only **full-screen capture with system
+audio** picks up that voice, and that forces sharing the desktop, mixes in every other sound and depends on the
+operating system.
 
-Consecuencia práctica: si el usuario pide «un MP3», se genera con Piper. Si pide «escucharlo», la página vale y
-es instantánea.
+And even if it were captured, it would not be an MP3: `MediaRecorder` returns WebM/Opus, and **no browser encodes
+MP3** (`AudioEncoder` with `mp3` has 0% support in the WebCodecs table; it only decodes). Converting it requires
+a third-party JavaScript library.
 
-### La tercera vía: MP3 con un motor dentro de la página
+Practical consequence: if the user asks for "an MP3", generate it with Piper. If they ask to "listen to it", the
+page is enough and is instant.
 
-Sí existe una forma de generar audio —y MP3— dentro de una página: **no usar la voz del sistema, sino un motor
-de síntesis compilado a WebAssembly**. Proyectos como `piper-tts-web` (MIT) devuelven un WAV listo para
-descargar, y con un codificador JavaScript (`lamejs`) se convierte en MP3.
+### The third route: MP3 with an engine inside the page
 
-Lo que cuesta, medido con las cifras publicadas por esos proyectos:
+There is a way to generate audio — and MP3 — inside a page: **do not use the system voice, use a synthesis
+engine compiled to WebAssembly**. Projects such as `piper-tts-web` (MIT) return a WAV ready to download, and
+with a JavaScript encoder (`lamejs`) it becomes an MP3.
 
-| Pieza | Tamaño | Nota |
+What it costs, measured with the figures published by those projects:
+
+| Piece | Size | Note |
 |---|---|---|
-| Voz Piper (`.onnx` + `.json`) | 30–75 MB | Una por idioma, caché del navegador |
-| `onnxruntime-web` | ~10 MB | Motor de inferencia |
-| Datos de espeak-ng | ~17 MB | Fonemización |
-| Codificador MP3 en JS | ~150 KB | Necesario: el navegador no codifica MP3 |
+| Piper voice (`.onnx` + `.json`) | 30–75 MB | One per language, browser cache |
+| `onnxruntime-web` | ~10 MB | Inference engine |
+| espeak-ng data | ~17 MB | Phonemisation |
+| MP3 encoder in JS | ~150 KB | Required: the browser does not encode MP3 |
 
-Dos consecuencias que lo aplazan, no que lo hagan imposible:
+Two consequences that postpone it, not that make it impossible:
 
-1. **No ahorra la instalación, la cambia de sitio.** La primera vez hay que bajar ~90 MB, y no se puede cachear
-   si la página se abre con `file://`: ese origen es opaco y el navegador no le da almacenamiento persistente.
-   Hace falta servirla por `http://localhost`, o sea, un servidor estático.
-2. **Es más lento y peor voz que la del sistema.** La inferencia en CPU va a 3–5× el tiempo real; la página
-   actual es instantánea y usa la voz que el usuario ya tiene instalada.
+1. **It does not save the installation, it moves it.** The first time ~90 MB must be downloaded, and it cannot
+   be cached if the page is opened with `file://`: that origin is opaque and the browser gives it no persistent
+   storage. It has to be served over `http://localhost`, that is, a static server.
+2. **It is slower and sounds worse than the system voice.** CPU inference runs at 3–5× real time; the current
+   page is instant and uses the voice the user already has installed.
 
-Por eso la página de escucha no lleva botón de descarga: un botón que solo funciona en la mitad de los casos y
-tras una descarga de 90 MB es peor que decir la verdad. La ruta WASM queda como puerta abierta para un modo sin
-Python, no como función de esta página. Si algún día se implementa, va como página aparte y con su propio
-contrato: aviso de tamaño, caché en origen `http` y MP3 opcional.
+That is why the listen page has no download button: a button that only works in half the cases and after a
+90 MB download is worse than telling the truth. The WASM route stays as an open door for a Python-free mode,
+not as a feature of this page. If it is ever implemented, it goes as a separate page with its own contract: size
+warning, cache on an `http` origin and optional MP3.
 
-### Comprobación de viabilidad
+### Feasibility check
 
-- **Chromium y Brave en modo headless devuelven cero voces** (no hay dispositivo de audio), así que la
-  viabilidad no se puede verificar desde un agente sin interfaz. La página incluye su propio diagnóstico: al
-  abrirla, muestra cuántas voces encuentra.
-- **Linux:** el navegador habla con `speech-dispatcher`. Si no está instalado o el navegador va confinado
-  (snap), la lista de voces puede salir vacía aunque el sistema tenga voces.
-- **Windows y macOS:** las voces del sistema están disponibles de serie; es el caso más sencillo.
+- **Chromium and Brave in headless mode return zero voices** (there is no audio device), so feasibility cannot
+  be verified from an agent without a display. The page includes its own diagnostic: when opened, it shows how
+  many voices it finds.
+- **Linux:** the browser speaks through `speech-dispatcher`. If it is not installed, or the browser is confined
+  (snap), the voice list may be empty even when the system has voices.
+- **Windows and macOS:** system voices are available out of the box; it is the simplest case.
 
-## MP3 con Piper
+## MP3 with Piper
 
 ```bash
-skills/speak-summary/scripts/tts.sh guion.txt <perfil>/materiales/generados/audio/E7_resumen_2026-11-15.mp3
+skills/speak-summary/scripts/tts.sh script.txt <profile>/materials/generated/audio/E7_summary_2026-11-15.mp3
 ```
 
-- Un resumen de 20 minutos tarda menos de un minuto de CPU.
-- Verifica duración y tamaño con `ffprobe`. Si se aleja de 20 minutos (menos de 18, más de 22), ajusta el
-  guion y regenera.
-- La voz se elige por idioma del perfil (`SPEAK_PIPER_LANG`, por defecto `es`). No inventes nombres de voz ni
-  cambies la voz sin que el usuario lo pida.
+- A 20-minute summary takes under a minute of CPU.
+- Check duration and size with `ffprobe`. If it drifts from 20 minutes (under 18, over 22), adjust the script
+  and regenerate.
+- The voice is chosen by the profile's language (`SPEAK_PIPER_LANG`, default `en`). Do not invent voice names or
+  change the voice unless the user asks.
 
-## El guion
+## The script
 
-El guion es lo que hace útil al audio. Se escribe para el oído, no se lee de los apuntes.
+The script is what makes the audio useful. It is written for the ear, not read from the notes.
 
-- **Duración fija, densidad variable.** 20 minutos. En castellano, una voz de ~167 palabras por minuto da
-  3.200–3.500 palabras. En otro idioma, mide una vez la velocidad de la voz elegida y ajusta el rango.
-- **Sin marcas visuales.** Ni viñetas, ni tablas, ni código, ni URL. Nada que el oyente no pueda ver.
-- **Apertura con orientación:** qué tema es, qué epígrafes cubre y cuánto dura.
-- **Conectores explícitos:** «Primero…», «El punto delicado es…», «Para terminar…».
-- **Siglas desarrolladas** la primera vez; cifras y fechas como se dicen.
-- **Frases de menos de 25 palabras.** Un audio no se relee.
-- **Cierre con lo que hay que retener** y una pregunta de repaso.
-- **Reparto 80/20:** si hay material propio, su estructura y sus conceptos mandan; toda cifra se verifica en
-  una fuente abierta antes de decirla en voz alta.
+- **Fixed duration, variable density.** 20 minutes. At roughly 167 words per minute, that is 3,200–3,500 words.
+  In another language, measure the chosen voice's speed once and adjust the range.
+- **No visual marks.** No bullets, no tables, no code, no URLs. Nothing the listener cannot see.
+- **Opening with orientation:** which topic it is, which sections it covers and how long it lasts.
+- **Explicit connectors:** "First…", "The delicate point is…", "To finish…".
+- **Abbreviations expanded** the first time; figures and dates the way they are spoken.
+- **Sentences under 25 words.** Audio is not re-read.
+- **Close with what to retain** and a review question.
+- **80/20 split:** if there is own material, its structure and concepts lead; every figure is verified against
+  an open source before it is said out loud.
 
-## Errores conocidos
+## Known errors
 
-| Síntoma | Causa | Arreglo |
+| Symptom | Cause | Fix |
 |---|---|---|
-| La página no suena | Cero voces | Instalar voces del sistema; usar MP3 |
-| Suena en otro idioma | Voz por defecto del sistema | Elegir voz en el selector |
-| Se corta a media frase | Párrafo demasiado largo | Párrafos más cortos en el guion |
-| Pronuncia mal un nombre | Grafía opaca | Escribirlo fonéticamente en el guion |
-| El MP3 dura 12 minutos | Guion corto | Ampliar contenido, no estirar el relleno |
-| No hay botón de descarga en la página | Es deliberado: el navegador no captura su voz ni codifica MP3 | Generar el MP3 con Piper |
+| The page is silent | Zero voices | Install system voices; use MP3 |
+| It speaks in another language | The system's default voice | Choose a voice in the selector |
+| It cuts off mid-sentence | Paragraph too long | Shorter paragraphs in the script |
+| It mispronounces a name | Opaque spelling | Write it phonetically in the script |
+| The MP3 lasts 12 minutes | Short script | Expand the content, do not stretch the filler |
+| No download button on the page | Deliberate: the browser cannot capture its voice or encode MP3 | Generate the MP3 with Piper |

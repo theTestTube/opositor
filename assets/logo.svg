@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-labelledby="title">
+  <title id="title">Opositor: an answer sheet with one correct choice per row</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#111827"/>
+      <stop offset="1" stop-color="#1e3a8a"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+
+  <rect x="146" y="90" width="240" height="336" rx="22" fill="#000000" opacity="0.28"/>
+  <rect x="136" y="80" width="240" height="336" rx="22" fill="#ffffff"/>
+
+  <rect x="168" y="118" width="112" height="15" rx="7.5" fill="#cbd5e1"/>
+  <rect x="168" y="145" width="64" height="9" rx="4.5" fill="#cbd5e1" opacity="0.65"/>
+
+  <!-- Row 1: second option chosen -->
+  <circle cx="176" cy="204" r="15" fill="none" stroke="#94a3b8" stroke-width="7"/>
+  <circle cx="232" cy="204" r="15" fill="#f59e0b" stroke="#f59e0b" stroke-width="7"/>
+  <circle cx="288" cy="204" r="15" fill="none" stroke="#94a3b8" stroke-width="7"/>
+  <circle cx="344" cy="204" r="15" fill="none" stroke="#94a3b8" stroke-width="7"/>
+
+  <!-- Row 2: fourth option chosen -->
+  <circle cx="176" cy="258" r="15" fill="none" stroke="#94a3b8" stroke-width="7"/>
+  <circle cx="232" cy="258" r="15" fill="none" stroke="#94a3b8" stroke-width="7"/>
+  <circle cx="288" cy="258" r="15" fill="none" stroke="#94a3b8" stroke-width="7"/>
+  <circle cx="344" cy="258" r="15" fill="#f59e0b" stroke="#f59e0b" stroke-width="7"/>
+
+  <!-- Row 3: first option chosen -->
+  <circle cx="176" cy="312" r="15" fill="#f59e0b" stroke="#f59e0b" stroke-width="7"/>
+  <circle cx="232" cy="312" r="15" fill="none" stroke="#94a3b8" stroke-width="7"/>
+  <circle cx="288" cy="312" r="15" fill="none" stroke="#94a3b8" stroke-width="7"/>
+  <circle cx="344" cy="312" r="15" fill="none" stroke="#94a3b8" stroke-width="7"/>
+
+  <!-- Row 4: third option chosen -->
+  <circle cx="176" cy="366" r="15" fill="none" stroke="#94a3b8" stroke-width="7"/>
+  <circle cx="232" cy="366" r="15" fill="none" stroke="#94a3b8" stroke-width="7"/>
+  <circle cx="288" cy="366" r="15" fill="#f59e0b" stroke="#f59e0b" stroke-width="7"/>
+  <circle cx="344" cy="366" r="15" fill="none" stroke="#94a3b8" stroke-width="7"/>
+
+  <!-- Correct-answer badge -->
+  <circle cx="378" cy="382" r="58" fill="#22c55e"/>
+  <path d="M352 382l18 19 36-41" fill="none" stroke="#ffffff" stroke-width="15"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

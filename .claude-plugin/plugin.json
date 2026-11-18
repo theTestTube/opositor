@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "opositor",
+  "displayName": "Opositor",
+  "version": "1.0.0",
+  "description": "Study material for any public examination: ranked sources per topic, a printable multiple-choice exam and a spoken summary.",
+  "author": {
+    "name": "theTestTube",
+    "url": "https://github.com/theTestTube"
+  },
+  "homepage": "https://github.com/theTestTube/opositor",
+  "repository": "https://github.com/theTestTube/opositor",
+  "license": "MIT",
+  "keywords": [
+    "study",
+    "exam",
+    "sources",
+    "pdf",
+    "text-to-speech",
+    "education"
+  ],
+  "skills": [
+    "."
+  ]
+}

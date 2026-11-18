@@ -17,11 +17,26 @@ headless cloud agent or CI container just as well as on a laptop.
 
 ## Prerequisites
 
-The synthesis engine is [Kyutai `pocket-tts`](https://github.com/kyutai-labs/pocket-tts),
-a small neural TTS model designed to run on CPUs.
+This copy ships **two engines**, and the default one is [Piper](https://github.com/rhasspy/piper):
 
-The bundled script installs it automatically into a cached virtualenv on first
-use, so usually you need do nothing. To install it explicitly:
+| Engine | Voices | Account | Speed |
+|---|---|---|---|
+| **Piper** (default) | One neural model per language, no login | None | Far above real time |
+| [`pocket-tts`](https://github.com/kyutai-labs/pocket-tts) (upstream) | Multilingual, short catalogue, voice cloning | Hugging Face login for cloning | Similar or slower |
+
+Piper needs `piper` and at least one voice model. The `setup` skill installs both
+for you; by hand it is:
+
+```bash
+python3 -m venv ~/.cache/opositor/piper-venv
+~/.cache/opositor/piper-venv/bin/python -m pip install piper-tts
+```
+
+Voice models (`.onnx` plus a `.json` beside it) go in `~/.cache/opositor/voices`.
+The engine picks the first model whose name starts with `SPEAK_PIPER_LANG`
+(default `en`), so a profile in another language sets that variable.
+
+To use the upstream engine instead, install it and set `SPEAK_ENGINE=pocket`:
 
 ```bash
 pip install pocket-tts          # any platform
@@ -34,10 +49,11 @@ you are on a very new Python, where installation would otherwise fail.
 
 You also need an encoder. `ffmpeg` is strongly preferred (`brew install ffmpeg`
 or `apt-get install -y ffmpeg`); on macOS the script falls back to the built-in
-`afconvert` and emits `.m4a` instead of `.mp3`.
+`afconvert` and emits `.m4a` instead of `.mp3`. Without any encoder, the Piper
+route writes a `.wav`.
 
-The first run downloads the model (~1GB) from Hugging Face. After that it is
-fully offline and synthesises roughly 6x faster than real-time.
+The first `pocket-tts` run downloads its model (~1GB) from Hugging Face. After
+that it is fully offline and synthesises roughly 6x faster than real-time.
 
 ## The important step: rewrite for the ear
 
@@ -72,17 +88,25 @@ into ~600 character chunks (quality degrades on long single inputs), synthesises
 each chunk, and concatenates the result into a mono MP3 at 96kbps — small enough
 to sync to a phone, good enough for speech.
 
+By default the script delegates to `tts-piper.sh`, which synthesises in one pass.
+Set `SPEAK_ENGINE=pocket` to use the upstream chunking path described above.
+
 Environment overrides:
 
 | Variable | Purpose |
 |---|---|
+| `SPEAK_ENGINE` | `piper` (default) or `pocket`. |
+| `SPEAK_PIPER_BIN` | Path to the `piper` binary. Default `~/.cache/opositor/piper-venv/bin/piper`. |
+| `SPEAK_PIPER_VOICES` | Voice model directory. Default `~/.cache/opositor/voices`. |
+| `SPEAK_PIPER_LANG` | Language prefix used to pick a voice. Default `en`. |
 | `SPEAK_TTS_BIN` | Path to a specific `pocket-tts` binary; skips all auto-detection. |
 | `SPEAK_TTS_HOME` | Where to create/find the cached virtualenv. Default `~/.cache/speak-summary/venv`. |
 
 ## Voices
 
-The default English voice is `alba`. To use a different one, `pocket-tts`
-supports voice cloning from a short clean audio sample:
+With Piper, pass a model as the third argument, or set `SPEAK_PIPER_VOICE`.
+With `pocket-tts`, the default English voice is `alba`, and voice cloning from a
+short clean audio sample is available:
 
 ```bash
 pocket-tts export-voice --help
@@ -96,6 +120,8 @@ voice — colleague, customer, or public figure — without their explicit conse
 ## Output
 
 - Default to `~/Music/Briefings/` unless the user says otherwise; it is easy to point a phone or podcast app at.
+  When the text comes from the `opositor` skill, write to `<profile>/materials/generated/audio/` instead, next
+  to the script.
 - Name files `<subject>-<YYYY-MM-DD>.mp3`.
 - Report the path, duration, and size.
 - Offer to play it: `afplay <path>` on macOS, `ffplay -nodisp -autoexit <path>` elsewhere.

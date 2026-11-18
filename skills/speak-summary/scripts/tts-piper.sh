@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# Convierte un guion de texto en un MP3 con Piper, síntesis neuronal local y rápida.
+# Turn a text script into an MP3 with Piper, fast local neural synthesis.
 #
-# Uso: tts-piper.sh <entrada.txt> <salida.mp3> [voz.onnx]
+# Usage: tts-piper.sh <input.txt> <output.mp3> [voice.onnx]
 #
-# Piper no necesita cuenta, funciona sin conexión y va muy por encima del tiempo real en CPU.
-# Es el motor de MP3 de esta skill; la alternativa sin instalar nada es la página de escucha
-# del navegador (`scripts/opositor.py tts-page`).
+# Piper needs no account, works offline and runs far above real time on CPU.
+# It is this skill's MP3 engine; the alternative that installs nothing is the browser
+# listen page (`scripts/opositor.py tts-page`).
 #
-# Orden de elección de voz:
-#   1. tercer argumento (ruta a un .onnx)
-#   2. $SPEAK_PIPER_VOICE (nombre tipo es_ES-davefx-medium, o ruta)
-#   3. la primera voz que empiece por $SPEAK_PIPER_LANG (por defecto «es»)
+# Voice selection order:
+#   1. third argument (path to an .onnx)
+#   2. $SPEAK_PIPER_VOICE (a name such as en_US-lessac-medium, or a path)
+#   3. the first voice that starts with $SPEAK_PIPER_LANG (default "en")
 set -euo pipefail
 
 IN="${1:?usage: tts-piper.sh <input.txt> <output.mp3> [voice.onnx]}"
@@ -19,25 +19,25 @@ VOICE_ARG="${3:-}"
 
 PIPER_HOME="${SPEAK_PIPER_HOME:-$HOME/.cache/opositor/piper-venv}"
 VOICE_DIR="${SPEAK_PIPER_VOICES:-$HOME/.cache/opositor/voices}"
-LANG_CODE="${SPEAK_PIPER_LANG:-es}"
+LANG_CODE="${SPEAK_PIPER_LANG:-en}"
 
 PIPER_BIN="${SPEAK_PIPER_BIN:-$PIPER_HOME/bin/piper}"
 [ -x "$PIPER_BIN" ] || {
-  echo "piper no encontrado. Prepara el motor con:" >&2
+  echo "piper not found. Prepare the engine with:" >&2
   echo "  python3 -m venv $PIPER_HOME && $PIPER_HOME/bin/python -m pip install piper-tts" >&2
-  echo "y deja al menos un modelo .onnx (con su .json) en $VOICE_DIR" >&2
+  echo "and leave at least one .onnx model (with its .json) in $VOICE_DIR" >&2
   exit 1
 }
 
 resolve_voice() {
   local want="${1:-${SPEAK_PIPER_VOICE:-}}"
   if [ -z "$want" ]; then
-    local primera
-    primera="$(find "$VOICE_DIR" -maxdepth 1 -name "${LANG_CODE}_*.onnx" | sort | head -1)"
-    [ -n "$primera" ] && { echo "$primera"; return 0; }
-    primera="$(find "$VOICE_DIR" -maxdepth 1 -name '*.onnx' | sort | head -1)"
-    [ -n "$primera" ] && { echo "$primera"; return 0; }
-    echo "No hay ninguna voz en $VOICE_DIR (busca un .onnx de $LANG_CODE)" >&2
+    local first
+    first="$(find "$VOICE_DIR" -maxdepth 1 -name "${LANG_CODE}_*.onnx" | sort | head -1)"
+    [ -n "$first" ] && { echo "$first"; return 0; }
+    first="$(find "$VOICE_DIR" -maxdepth 1 -name '*.onnx' | sort | head -1)"
+    [ -n "$first" ] && { echo "$first"; return 0; }
+    echo "No voice in $VOICE_DIR (looking for an $LANG_CODE .onnx)" >&2
     return 1
   fi
   case "$want" in
@@ -47,7 +47,7 @@ resolve_voice() {
 }
 
 VOICE="$(resolve_voice "$VOICE_ARG")" || exit 1
-[ -f "$VOICE" ] || { echo "Modelo de voz no encontrado: $VOICE" >&2; exit 1; }
+[ -f "$VOICE" ] || { echo "Voice model not found: $VOICE" >&2; exit 1; }
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
@@ -79,7 +79,7 @@ if command -v ffmpeg >/dev/null 2>&1; then
 else
   OUT="${OUT%.mp3}.wav"
   cp "$WORK/speech.wav" "$OUT"
-  echo "Note: ffmpeg no disponible; escrito WAV en su lugar." >&2
+  echo "Note: ffmpeg not available; wrote WAV instead." >&2
 fi
 
-echo "Wrote $OUT ($(du -h "$OUT" | cut -f1), voz $(basename "$VOICE" .onnx))"
+echo "Wrote $OUT ($(du -h "$OUT" | cut -f1), voice $(basename "$VOICE" .onnx))"

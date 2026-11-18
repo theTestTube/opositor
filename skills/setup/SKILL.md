@@ -1,147 +1,154 @@
 ---
 name: setup
-description: Prepare this repository and a new examination profile so the opositor skill can run without the user typing commands. Detects Python, the PDF library, audio engines and browser voices, installs only what is missing, scaffolds oposiciones/<slug>/, and reports what works and what degraded.
+description: Prepare this plugin and a new examination profile so the opositor skill can run without the user typing commands. Detects Python, the PDF library, audio engines and browser voices, installs only what is missing, scaffolds a profile under the data root, and reports what works and what degraded.
 ---
 
-# Preparar el entorno
+# Preparing the environment
 
-Esta skill la ejecuta **el agente**, no el usuario. El usuario pide («prepárate», «instala lo que falte»,
-«crea la oposición X») y tú corres los comandos, compruebas el resultado y cuentas qué ha quedado.
+This skill is run by **the agent**, not the user. The user asks ("set yourself up", "install what is missing",
+"create the X exam") and you run the commands, check the result and report what is left.
 
-Regla dura: **no pidas al usuario que ejecute comandos**. Si algo no se puede resolver sin privilegios, se
-explica en una línea y se sigue con la degradación más cercana.
+Hard rule: **never ask the user to run commands**. If something cannot be solved without privileges, explain it
+in one line and continue with the closest degradation.
 
-## 0. Diagnóstico antes de instalar
+## 0. Diagnose before installing
 
-Ejecuta y guarda la salida:
+Run this and keep the output:
 
 ```bash
 python3 --version
 python3 -c "import reportlab, sys; print('reportlab', reportlab.Version)" 2>&1 | tail -1
 command -v ffmpeg ffprobe piper uv pipx
 ls ~/.cache/opositor/voices 2>/dev/null
+python3 scripts/opositor.py home
 ```
 
-Interpretación:
+How to read it:
 
-| Señal | Significa | Acción |
+| Signal | Meaning | Action |
 |---|---|---|
-| `python3` ≥ 3.10 | Base correcta | Seguir |
-| `python3` < 3.10 | Sin soporte | Avisar: hay que actualizar el intérprete; el resto puede funcionar |
-| `reportlab` importa | PDF disponible | Nada que hacer |
-| `ModuleNotFoundError` | Falta PDF | Paso 1 |
-| `ffmpeg` y `ffprobe` presentes | MP3 y verificación de duración | Nada que hacer |
-| `piper` o voces en `~/.cache/opositor/voices` | MP3 sin depender del navegador | Nada que hacer |
-| Nada de audio | Solo página de escucha del navegador | Es válido: es el modo por defecto |
+| `python3` ≥ 3.10 | Correct base | Continue |
+| `python3` < 3.10 | Unsupported | Warn: the interpreter must be updated; the rest may work |
+| `reportlab` imports | PDF available | Nothing to do |
+| `ModuleNotFoundError` | PDF missing | Step 1 |
+| `ffmpeg` and `ffprobe` present | MP3 and duration checks | Nothing to do |
+| `piper` or voices in `~/.cache/opositor/voices` | MP3 without the browser | Nothing to do |
+| No audio at all | Browser listen page only | That is valid: it is the default mode |
 
-**No asumas `uv`.** Está muy bien si aparece, pero el camino principal es `venv` + `pip` de la distribución.
-Si tampoco hay `venv`, el camino es `pip install --user`, y si el sistema bloquea la instalación (PEP 668),
-se queda en modo degradado y se dice.
+**Do not assume `uv`.** It is great if it is there, but the main path is the distribution's `venv` + `pip`. If
+there is no `venv` either, the path is `pip install --user`, and if the system blocks installation (PEP 668),
+the skill stays in degraded mode and says so.
 
-## 1. PDF (opcional, pero necesario para exámenes)
+**The data root is outside the repository.** `opositor.py home` prints it: `$OPOSITOR_DATA` when set, otherwise
+a per-user directory (`~/.local/share/opositor` on Linux, `~/Library/Application Support/opositor` on macOS,
+`%LOCALAPPDATA%\opositor` on Windows). Never write inside the plugin directory: plugin updates replace it.
 
-Crea el entorno dentro del repositorio, que ya está ignorado por git:
+## 1. PDF (optional, but needed for exams)
 
-```bash
-python3 -m venv .venv && .venv/bin/python -m pip install --upgrade pip reportlab
-```
-
-Si `python3 -m venv` falla porque falta el módulo del sistema, prueba en este orden y para en el primero que
-funcione:
-
-1. `python3 -m venv --without-pip .venv` y luego `python3 -m ensurepip --upgrade` dentro del entorno.
-2. `pip install --user reportlab` (sin entorno).
-3. `uv venv .venv && uv pip install --python .venv/bin/python reportlab`, solo si `uv` existe.
-4. `pipx` no sirve aquí: reportlab es una biblioteca, no una aplicación.
-
-Si nada funciona, informa de que el examen saldrá en HTML o no saldrá, y sigue. **No instales paquetes del
-sistema ni uses `sudo`** sin permiso explícito del usuario.
-
-Comprueba siempre con el mismo intérprete que se usará después:
+Create the environment inside the data root, so it survives plugin updates:
 
 ```bash
-.venv/bin/python -c "import reportlab; print(reportlab.Version)"
+ROOT="$(python3 scripts/opositor.py home)"
+python3 -m venv "$ROOT/venv" && "$ROOT/venv/bin/python" -m pip install --upgrade pip reportlab
 ```
 
-Y recuerda al usuario, en la respuesta final, qué intérprete queda activo: `.venv/bin/python` o `python3`.
+If `python3 -m venv` fails because the system module is missing, try these in order and stop at the first that
+works:
+
+1. `python3 -m venv --without-pip "$ROOT/venv"` and then `python3 -m ensurepip --upgrade` inside the
+   environment.
+2. `pip install --user reportlab` (no environment).
+3. `uv venv "$ROOT/venv" && uv pip install --python "$ROOT/venv/bin/python" reportlab`, only if `uv` exists.
+4. `pipx` is no use here: reportlab is a library, not an application.
+
+If nothing works, report that the exam will be HTML or will not be generated, and continue. **Do not install
+system packages or use `sudo`** without the user's explicit permission.
+
+Always verify with the same interpreter that will be used later:
+
+```bash
+"$ROOT/venv/bin/python" -c "import reportlab; print(reportlab.Version)"
+```
+
+The `opositor.py pdf` command finds that interpreter by itself, so in the final answer you only need to say
+whether the PDF is available or degraded.
 
 ## 2. Audio
 
-Hay dos caminos y **el de por defecto no instala nada**:
+There are two routes and **the default one installs nothing**:
 
-| Camino | Requisitos | Salida | Cuándo |
+| Route | Requirements | Output | When |
 |---|---|---|---|
-| Página de escucha | Solo un navegador con voces del sistema | HTML autocontenido | Por defecto |
-| MP3 con Piper | `piper` + voces + `ffmpeg` | `.mp3` | Coche, móvil, compartir, sin navegador |
+| Listen page | Only a browser with system voices | Self-contained HTML | Default |
+| MP3 with Piper | `piper` + voices + `ffmpeg` | `.mp3` | Car, phone, sharing, no browser |
 
-1. **Comprueba el navegador.** Genera una página de prueba y ábrela:
+1. **Check the browser.** Generate a test page and open it:
 
    ```bash
-   python3 scripts/opositor.py tts-page --demo .scratchpad/prueba-voces.html
+   python3 scripts/opositor.py tts-page --demo .scratchpad/voice-test.html
    ```
 
-   La propia página lista las voces detectadas. Si dice «0 voces», explica el arreglo del sistema
-   (`speech-dispatcher` en Linux; en Windows y macOS suele haber voces de serie) y ofrece el MP3.
-2. **Instala Piper solo si el usuario quiere MP3.** Entorno propio, sin tocar el del PDF:
+   The page itself lists the voices it detects. If it says "0 voices", explain the system fix
+   (`speech-dispatcher` on Linux; Windows and macOS usually ship voices) and offer MP3.
+2. **Install Piper only if the user wants MP3.** Separate environment, without touching the PDF one:
 
    ```bash
    python3 -m venv ~/.cache/opositor/piper-venv
    ~/.cache/opositor/piper-venv/bin/python -m pip install piper-tts
    ```
 
-   Las voces van a `~/.cache/opositor/voices` (una por idioma del perfil). No descargues voces sin decir
-   cuál y por qué.
-3. **No prometas MP3 si no hay Piper.** La página de escucha no puede exportar audio: el navegador sintetiza
-   y reproduce, no escribe archivos.
+   Voices go to `~/.cache/opositor/voices` (one per profile language). Do not download voices without saying
+   which one and why.
+3. **Do not promise MP3 if Piper is missing.** The listen page cannot export audio: the browser synthesises and
+   plays, it does not write files.
 
-## 3. Alta de una oposición
+## 3. Creating an exam profile
 
-Con el entorno listo, crea el perfil siguiendo `references/alta.md`:
+With the environment ready, create the profile following `references/setup.md`:
 
 ```bash
-python3 scripts/opositor.py init <slug> --nombre "<nombre>" --ambito "<administración>" [--idioma es-ES]
+python3 scripts/opositor.py init <slug> --name "<name>" --scope "<administration>" [--language en-US]
 ```
 
-Luego rellena los archivos con datos oficiales (temario, perfil del puesto, fuentes y `materiales/LEEME.md`)
-y valida:
+Then fill the files with official data (syllabus, role profile, sources and `materials/NOTES.md`) and validate:
 
 ```bash
 python3 scripts/opositor.py check <slug>
 ```
 
-Si el usuario ya tenía un perfil de una versión anterior, `check` es lo primero que se ejecuta: dice qué
-campos faltan sin tocar nada.
+If the user already had a profile from an earlier version, `check` is the first thing to run: it says which
+fields are missing without touching anything.
 
-## 4. Verificación final
+## 4. Final verification
 
 ```bash
 python3 scripts/opositor.py doctor
-python3 scripts/opositor.py check --privacidad
+python3 scripts/opositor.py check --privacy
 ```
 
-`doctor` resume intérprete, PDF, audio y perfiles detectados. `check --privacidad` compara los archivos
-versionados con la lista local de términos y avisa de cualquier fuga antes de publicar.
+`doctor` summarises interpreter, PDF, audio and detected profiles. `check --privacy` compares the versioned
+files with the local list of terms and warns about any leak before publishing.
 
-## 5. Qué contesta el agente
+## 5. What the agent reports
 
-Una tabla corta, sin jerga:
+A short table, no jargon:
 
-| Pieza | Estado | Cómo se usa |
+| Piece | Status | How it is used |
 |---|---|---|
 | Python 3.x | ✅ / ⚠️ | |
-| PDF (`reportlab`) | ✅ / ❌ | Examen en PDF o degradado |
-| Página de escucha | ✅ | Se abre en el navegador |
-| MP3 (`piper`) | ✅ / ❌ | Audio descargable |
-| Perfil `<slug>` | ✅ / pendiente | |
+| PDF (`reportlab`) | ✅ / ❌ | Exam as PDF or degraded |
+| Listen page | ✅ | Opens in the browser |
+| MP3 (`piper`) | ✅ / ❌ | Downloadable audio |
+| Profile `<slug>` | ✅ / pending | |
 
-Y una frase con el siguiente paso concreto. Nada de listas de comandos para copiar y pegar.
+And one sentence with the concrete next step. No lists of commands to copy and paste.
 
-## Errores conocidos
+## Known errors
 
-- **`externally-managed-environment`** al instalar: es PEP 668. Usa entorno virtual; no lo fuerces con
-  `--break-system-packages`.
-- **`No module named venv`**: falta `python3-venv` en el sistema. Cae a `pip --user`.
-- **La página de escucha no dice nada**: el navegador no tiene voces o el audio está silenciado. En Linux,
-  `speech-dispatcher` y una voz instalada; en navegadores snap, la confinación puede bloquear el acceso.
-- **Piper instala pero no encuentra el modelo**: la voz debe estar en el directorio de voces y con su `.json`
-  al lado.
+- **`externally-managed-environment`** when installing: that is PEP 668. Use a virtual environment; do not force
+  it with `--break-system-packages`.
+- **`No module named venv`**: the system lacks `python3-venv`. Fall back to `pip --user`.
+- **The listen page says nothing**: the browser has no voices or the audio is muted. On Linux, install
+  `speech-dispatcher` and a voice; in snap browsers, confinement can block access.
+- **Piper installs but cannot find the model**: the voice must be in the voices directory with its `.json` next
+  to it.

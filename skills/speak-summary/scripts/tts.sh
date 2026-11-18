@@ -14,9 +14,9 @@
 # Set SPEAK_TTS_BIN to point at a specific pocket-tts binary to skip all this.
 set -euo pipefail
 
-# Local patch: this copy defaults to Piper, which has Castilian es_ES voices and
-# needs no account. Set SPEAK_ENGINE=pocket to use the upstream pocket-tts path
-# below (Spanish voice 'lola'; voice cloning requires a Hugging Face login).
+# Local patch: this copy defaults to Piper, which needs no account and ships
+# neural voices for many languages. Set SPEAK_ENGINE=pocket to use the upstream
+# pocket-tts path below (voice cloning requires a Hugging Face login).
 if [ "${SPEAK_ENGINE:-piper}" = "piper" ]; then
   exec "$(dirname "$0")/tts-piper.sh" "$@"
 fi
@@ -34,13 +34,10 @@ if [ -z "$VOICE" ] && [ -f "$DEFAULT_VOICE" ]; then
 fi
 
 # Local patch: pocket-tts is multilingual (english, french, german, italian,
-# portuguese, spanish, dutch). Without --language it always speaks English, so
-# Spanish text is read with English phonetics. Override with SPEAK_TTS_LANG,
-# e.g. SPEAK_TTS_LANG=spanish for the fast 6-layer model, or
-# SPEAK_TTS_LANG=english to go back to upstream behaviour.
-# When no voice is given, pocket-tts picks the built-in voice for that language
-# (lola for Spanish).
-TTS_LANG="${SPEAK_TTS_LANG:-spanish_24l}"
+# portuguese, spanish, dutch). Set SPEAK_TTS_LANG to the profile's language, for
+# example SPEAK_TTS_LANG=spanish for the fast 6-layer model.
+# When no voice is given, pocket-tts picks the built-in voice for that language.
+TTS_LANG="${SPEAK_TTS_LANG:-english}"
 
 TTS_HOME="${SPEAK_TTS_HOME:-$HOME/.cache/speak-summary/venv}"
 

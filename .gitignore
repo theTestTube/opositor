@@ -1,19 +1,19 @@
-# --- Datos de estudio: nunca se versionan -------------------------------------
-# Cada oposición vive en oposiciones/<slug>/ (temario, fuentes, materiales y
-# salidas). Es material privado del usuario: temario copiado, apuntes, exámenes,
-# PDFs y audios generados. El repositorio solo versiona el núcleo agnóstico.
+# --- Study data: never versioned ----------------------------------------------
+# Each examination lives in its own profile (syllabus, sources, materials and
+# outputs). It is the user's private material: copied syllabi, notes, past exams,
+# generated PDFs and audio. The repository only versions the exam-agnostic core.
 oposiciones/
 
-# Artefactos de trabajo y borradores fuera de control de versiones.
+# Work artefacts and drafts kept out of version control.
 .scratchpad/
 
-# --- Salidas sueltas ----------------------------------------------------------
+# --- Stray outputs ------------------------------------------------------------
 *.mp3
 *.wav
 *.m4a
 *.pdf
 
-# --- Entorno ------------------------------------------------------------------
+# --- Environment --------------------------------------------------------------
 __pycache__/
 *.pyc
 .venv/
