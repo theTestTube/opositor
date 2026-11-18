@@ -1,6 +1,6 @@
 ---
 name: opositor
-description: Find, rank and package open study material for any public examination (oposición). The exam and its syllabus are the first parameter; the skill resolves a profile under the data root (or --exam <slug>) and then works on one or more topics, returning up to 10 ranked URLs per topic with the reason each one is included. On request it also builds a multiple-choice practice exam as a PDF and a 20-minute spoken summary as audio. Use it whenever the user asks for material, notes, regulations, resources, a test or audio for a topic of an exam ("tema 7 específico", "temas 6, 7 y 8", "examen de 100 preguntas del tema 12", "test difícil del tema 8", "resumen para el coche del tema 9"), names an exam profile, or wants to set one up — even if they never say "skill" or give the topic number.
+description: Find, rank and package open study material for any public examination (oposición). The exam and its syllabus are the first parameter; the skill resolves a profile under the data root (or --exam <slug>) and then works on one or more topics, returning up to 10 ranked URLs per topic with the reason each one is included. On request it also builds a multiple-choice practice exam as a PDF (low, high or max difficulty, never repeating an earlier exam's question with the same answer) and a 20-minute spoken summary as audio. Use it whenever the user asks for material, notes, regulations, resources, a test or audio for a topic of an exam ("tema 7 específico", "temas 6, 7 y 8", "examen de 100 preguntas del tema 12", "test difícil del tema 8", "resumen para el coche del tema 9"), names an exam profile, or wants to set one up — even if they never say "skill" or give the topic number.
 ---
 
 # Study material for a public examination
@@ -77,6 +77,7 @@ split this way.
    |---|---|---|
    | `low` (default) | up to 6 | each topic asks for fewer cross-checked sources |
    | `high` | up to 3 | practical scenarios, literal detail and cross-review |
+   | `max` | up to 3 | everything in `high`, plus a no-repeat check against every earlier exam of the topic |
 
 3. Reuse shared work: a regulation, a guide or a repeated section is opened and scored once, then cited in every
    list that needs it, marked "also in E8".
@@ -195,12 +196,16 @@ searching**. If the gazette publishes a new programme, that text wins: offer to 
 
 Prepare the list of sources first (steps 1–6). Then:
 
-1. **Path:** `<profile>/materials/generated/<code>_practice_exam.pdf`, using the syllabus code
-   (`E7_practice_exam.pdf`, `C4_practice_exam.pdf`). If the file exists, replace it and say so.
+1. **Path:** one file per level, so a new level never wipes an earlier one:
+   `<profile>/materials/generated/<code>_practice_exam.pdf` for `low`, and `<code>_practice_exam_high.pdf` or
+   `<code>_practice_exam_max.pdf` for the others (`E7_practice_exam.pdf`, `C4_practice_exam_max.pdf`). Save the bank
+   next to it with the same name and a `.json` extension: it is what the no-repeat check of step 7 reads. Replace
+   only an exam **of the same level**, and say so. Earlier exams of another level stay; they are the student's
+   material and the baseline for step 7.
 2. **Content:** by default, 100 questions with four short options (one line; four only in exceptional cases) and
    a single correct one. Distribute them across blocks that follow the topic's sections, plus a block on
    techniques or common framework if the topic has one.
-3. **Difficulty** (`--difficulty low|high`; `low` if the user does not say):
+3. **Difficulty** (`--difficulty low|high|max`; `low` if the user does not say):
    - **low**: direct questions about a concept, a definition or a fact.
    - **high**: mimics the format of the official exercise described in `<profile>/role.md`.
      - About 20 questions in 2 or 3 **practical scenarios**: blocks with a common case in the `scenario` field,
@@ -212,9 +217,22 @@ Prepare the list of sources first (steps 1–6). Then:
      - At most 10% of questions in the negative ("which is NOT…?"), with "NOT" in capitals.
      - The hard part must be choosing between similar options, not guessing what the wording meant. Every
        answer has to be verifiable in an open source.
+   - **max**: for a student who already scores above 90% on `high`. It keeps every rule of `high` and raises the
+     bar in ways the bank can prove:
+     - 30 to 40 questions in 3 or 4 **scenarios**, each one forcing two sections, or a regulation and a technique,
+       to be combined in a single decision.
+     - Questions that make the student work, not recognise: order steps, phases or dates; count items ("how many
+       criteria change…"); compute (a percentage of a working week, the staff a ratio gives); combine statements
+       ("I and III are correct"); apply two classifications at once to the same case.
+     - Near-miss options: neighbouring figures (49/50 %, 6 or 7 years), the next edition or the previous phase,
+       a true statement that belongs to another concept. Where the notes and a source disagree, ask the point and
+       let the source win.
+     - The correct option is the longest one in **at most 30%** of the questions; check it with the bank.
+     - Still at most 10% negatives, still a single valid answer that an opened source confirms, still the 80/20
+       split counted, not rounded.
 
-   Put `"difficulty": "low"` or `"high"` in the bank and pass the same option to the script. It appears in the
-   PDF header. The file path does not change with difficulty.
+   Put `"difficulty": "low"`, `"high"` or `"max"` in the bank and pass the same option to the script. It appears
+   in the PDF header; the level also sets the file name (step 1).
 4. **Basis for the questions:** the concrete data (regulations, figures, codes, criteria) comes from the sources
    you opened. Anything from general knowledge must be settled doctrine and not disputed. If a fact varies by
    author (the order of a hierarchy, indicative ages), reword the question or drop it. Do not copy text from
@@ -228,7 +246,22 @@ Prepare the list of sources first (steps 1–6). Then:
    and report 0%.
 6. **No overlap:** if a concept belongs to another topic, ask about it only as it affects this one. If the
    neighbouring topic's exam already exists in `materials/generated/`, review it.
-7. **Generation:** write the bank as JSON (format in the header of `scripts/exam_pdf.py`) in a temporary
+7. **No repeats across levels.** A new exam must not hand back an earlier one. A question may return, but
+   never as "same question + same answer": when a stem matches an earlier question of the topic, its correct
+   answer is worded another way and **every** option is new, not a reshuffle of the old ones. Two different
+   questions that happen to share an answer are fine. Check it before building the PDF, against every earlier exam
+   of the topic, at any level, as JSON banks or as PDFs this skill generated:
+
+   ```bash
+   python3 scripts/opositor.py overlap bank.json \
+     <profile>/materials/generated/E7_practice_exam.json <profile>/materials/generated/E7_practice_exam_high.pdf
+   ```
+
+   It exits with an error and lists each conflict (similar stem plus the same answer or a reused option). Fix
+   the bank and run it again until it reports `0 conflicts`. If it warns that a PDF gave fewer questions than
+   expected, check that file by hand before trusting the result. With several topics, also run the new banks
+   against each other. Report the count in the answer (`checked against 2 earlier exams, 0 repeats`).
+8. **Generation:** write the bank as JSON (format in the header of `scripts/exam_pdf.py`) in a temporary
    directory and run it yourself:
 
    ```bash
@@ -245,7 +278,7 @@ Prepare the list of sources first (steps 1–6). Then:
    applicable) and, as a final section on a separate page, the **Solutions**: a quick answer key and the full
    answer to each question. The PDF texts (header, footer, titles) come from `config.json`, so the document
    speaks the profile's language.
-8. **Review:** render at least the first page and the solutions page, and check that they look right (accents,
+9. **Review:** render at least the first page and the solutions page, and check that they look right (accents,
    marks, page breaks) and that no question page reveals an answer.
 
 ## 10. 20-minute spoken summary per topic (optional)
@@ -266,7 +299,10 @@ The script rules and the two ways to listen to it are in `references/audio.md`; 
 2. **Density by `--difficulty`** (default `low`): `low` explains what each concept is, what it is for, and the
    key definitions and figures in the order of the sections, with one example per block; `high` adds exceptions
    and requirements from the regulation, deadlines, percentages, who does what, pairs of concepts that get
-   confused, and a scenario solved out loud every two or three sections.
+   confused, and a scenario solved out loud every two or three sections; `max` takes the definitions as known and
+   spends the time on traps: neighbouring figures, orderings, notes-versus-source corrections, short spoken
+   quizzes ("pause, answer, go on") and three cases solved out loud. It does not retell the earlier summary of
+   the topic: if one exists in `materials/generated/audio/`, read it first and go further.
 3. **80/20 split.** If the topic has own material in `<profile>/materials/own/`, at least **80% of the script**
    comes from there: its structure, its concepts, its examples and the order in which it presents them. The
    remaining 20% and **every fact check** come from the open sources of step 2. If a reliable source contradicts
